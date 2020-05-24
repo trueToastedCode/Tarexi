@@ -14,8 +14,9 @@ public class Combinator extends Thread {
     ArrayList<String> keywords;
     ArrayList<String> binder;
     String fName;
+    boolean active;
 
-    Combinator(int name, int min, int max, int threads, String fName, ArrayList<String> keywords, int maxWordCount, int maxTimesPerMaxWordCount, ArrayList<String> binder) {
+    Combinator(int name, int min, int max, int threads, String fName, ArrayList<String> keywords, int maxWordCount, int maxTimesPerMaxWordCount, ArrayList<String> binder, boolean active) {
         this.name = name;
         this.min = min;
         this.max = max;
@@ -25,21 +26,24 @@ public class Combinator extends Thread {
         this.maxWordCount = maxWordCount;
         this.maxTimesPerMaxWordCount = maxTimesPerMaxWordCount;
         this.binder = binder;
+        this.active = active;
     }
 
     public void run() {
-        // prepare file and writer
         BufferedWriter writer = null;
-        File file;
-        if(threads == 1) {
-            file = new File(fName);
-        }else {
-            file = new File(injectStrForExtension(fName, String.valueOf(name)));
-        }
-        try {
-            writer = new BufferedWriter(new FileWriter(file));
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (active) {
+            // prepare file and writer
+            File file;
+            if(threads == 1) {
+                file = new File(fName);
+            }else {
+                file = new File(injectStrForExtension(fName, "_" + name));
+            }
+            try {
+                writer = new BufferedWriter(new FileWriter(file));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         // combine
@@ -54,8 +58,8 @@ public class Combinator extends Thread {
                 }
             }
             // combine current table
-            boolean con = true;
-            boolean con2 = true;
+            boolean con, con2;
+            con = con2 = true;
             while(true) {
                 // update table
                 for (int pos = block - 1; pos >= 0; pos--) {
@@ -70,44 +74,46 @@ public class Combinator extends Thread {
                     }
                 }
                 if(con) {
-                    // check maxWordCount and maxWordsPerWordCount
-                    if(maxWordCount != 0) {
-                        if(getWordsOverstepped(table, maxWordCount, maxTimesPerMaxWordCount)) {
-                            con2 = false;
-                        }else {
-                            con2 = true;
+                    if (active) {
+                        // check maxWordCount and maxWordsPerWordCount
+                        if(maxWordCount != 0) {
+                            if(getWordsOverstepped(table, maxWordCount, maxTimesPerMaxWordCount)) {
+                                con2 = false;
+                            }else {
+                                con2 = true;
+                            }
                         }
-                    }
-                    // output
-                    if(con2) {
-                        try {
-                            // need to differentiate because of binder algorithm
-                            if(block != 1) {
-                                String[] out = new String[binder.size()];
-                                for(int i=0; i < binder.size(); i++) {
-                                    out[i] = "";
-                                }
-
-                                for(int pos=0; pos < block; pos++) {
-                                    String word = keywords.get(table[pos]);
+                        // output
+                        if(con2) {
+                            try {
+                                // need to differentiate because of binder algorithm
+                                if(block != 1) {
+                                    String[] out = new String[binder.size()];
                                     for(int i=0; i < binder.size(); i++) {
-                                        out[i] += word;
-                                        if(pos != block-1) {
-                                            out[i] += binder.get(i);
+                                        out[i] = "";
+                                    }
+
+                                    for(int pos=0; pos < block; pos++) {
+                                        String word = keywords.get(table[pos]);
+                                        for(int i=0; i < binder.size(); i++) {
+                                            out[i] += word;
+                                            if(pos != block-1) {
+                                                out[i] += binder.get(i);
+                                            }
                                         }
                                     }
-                                }
 
-                                for(String str : out) {
-                                    writer.write(str);
+                                    for(String str : out) {
+                                        writer.write(str);
+                                        writer.write("\n");
+                                    }
+                                }else {
+                                    writer.write(keywords.get(table[0]));
                                     writer.write("\n");
                                 }
-                            }else {
-                                writer.write(keywords.get(table[0]));
-                                writer.write("\n");
+                            } catch (IOException e) {
+                                e.printStackTrace();
                             }
-                        } catch (IOException e) {
-                            e.printStackTrace();
                         }
                     }
                     // increase table & progress bar
@@ -119,13 +125,14 @@ public class Combinator extends Thread {
             }
         }
 
-        // close writer
-        try {
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (active) {
+            // close writer
+            try {
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-
     }
 
     // investigate a list ti max word count and how often the limit exists, return true or false if list equates to parameters

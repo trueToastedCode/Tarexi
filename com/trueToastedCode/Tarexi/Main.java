@@ -14,18 +14,38 @@ public class Main {
         // all available options
         ArrayList<String> keywords = new ArrayList<String>();
         ArrayList<String> binder = new ArrayList<String>();;
-        int min, max, threads, maxWordCount, maxTimesPerMaxWordCount;
+        int min, max, maxWordCount, maxTimesPerMaxWordCount;
+        int[] aThreads;
         String fname;
 
         // output art and info
         InputStream is = Main.class.getResourceAsStream("art.txt");
         System.out.println(convertStreamToString(is));
-        System.out.println("\n                Tarexi@BETA3 by trueToastedCode\n");
+        System.out.println("\n              Tarexi@BETA3.1 by trueToastedCode\n");
 
         // get user choices
         min = Integer.valueOf(input("min: "));
         max = Integer.valueOf(input("max: "));
-        threads = Integer.valueOf(input("threads: "));
+
+        int threads = Integer.valueOf(input("threads: "));
+        String strAThreads = input("Active Threads (0-" + (threads-1) + ", -1 to deactivate): ");
+
+        if (strAThreads.intern() == "-1") {
+            aThreads = new int[threads];
+            for (int i=0; i<threads; i++) {
+                aThreads[i] = i;
+            }
+        }else {
+            aThreads = new int[strAThreads.length()];
+            for (int i=0; i<strAThreads.length(); i++) {
+                aThreads[i] = Integer.valueOf(String.valueOf(strAThreads.charAt(i)));
+                if (aThreads[i] >= threads) {
+                    System.out.print("Thread num " + aThreads[i] + " does not exist!");
+                    System.exit(1);
+                }
+            }
+        }
+
         fname = input("file name: ");
 
         // set extension if needed
@@ -52,8 +72,9 @@ public class Main {
             progressBar.start();
             keywords.addAll(createMoreWords(keywords));
             while (progressBar.isAlive()) { }
+            System.out.print("\n");
         }
-        if(input("\nset binders(y/n): ").intern() == "y") {
+        if(input("set binders(y/n): ").intern() == "y") {
             System.out.println("seperate with ;");
             String in = input("binders: ");
             String[] split = in.split(";");
@@ -74,12 +95,18 @@ public class Main {
         progressBar = new ProgressBar(combinations);
         progressBar.start();
 
-        Combinator combinator;
-        for(int i=0; i<threads; i++) {
-            combinator = new Combinator(i, min, max, threads, fname, keywords, maxWordCount, maxTimesPerMaxWordCount, binder);
+        for (int i=0; i<threads; i++) {
+            boolean active = false;
+            for (int threadNum : aThreads) {
+                if (threadNum == i) {
+                    active = true;
+                    break;
+                }
+            }
+
+            Combinator combinator = new Combinator(i, min, max, threads, fname, keywords, maxWordCount, maxTimesPerMaxWordCount, binder, active);
             combinator.start();
         }
-
     }
 
     public static String convertStreamToString(java.io.InputStream is) {
