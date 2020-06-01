@@ -6,30 +6,38 @@ import java.math.RoundingMode;
 
 public class ProgressBar extends Thread {
 
-    BigDecimal progress, complete, onePerc;
-    //String base_msg = "▌ %s ▐ %s";
-    String base_msg = "< %s > %s";
-    String base_fill = "█";
-    long timeStart;
-    int sleep = 100;
+    private BigDecimal onePerc;
+    private BigInteger progress, numComplete;
+    private Combiner[] combiners;
+    private int sleep = 100;
+    private long timeStart;
+    private boolean maxTime;
+    private String baseMsg = "<%s> %s", baseFill = "█";
 
-    public ProgressBar(BigInteger complete) {
-        this.progress = BigDecimal.ZERO;
-        this.complete = new BigDecimal(complete);
-        this.onePerc = this.complete.divide(BigDecimal.valueOf(100));
+    public ProgressBar(Combiner[] combiners, BigInteger numComplete) {
+        this.combiners = combiners;
+        this.numComplete = numComplete;
+        this.progress = BigInteger.ZERO;
+        this.onePerc = new BigDecimal(this.numComplete).divide(BigDecimal.valueOf(100));
+        maxTime = false;
     }
 
     @Override
     public void run() {
         String msg;
-
         timeStart = System.currentTimeMillis();
 
-        while (progress.compareTo(complete) == -1) {
+        while (progress.compareTo(numComplete) == -1) {
+            // get progress
+            BigInteger bi = progress;
+            progress = BigInteger.ZERO;
+            for (Combiner combiner : combiners)
+                progress = progress.add(combiner.getProgress());
+            bi = progress.subtract(bi);
             // print current message
-            msg = getMsg();
+            msg = getMsg(bi);
             System.out.print(msg);
-            // sleep 5s
+            // sleep
             try {
                 Thread.sleep(sleep);
             } catch (InterruptedException e) {
@@ -41,38 +49,52 @@ public class ProgressBar extends Thread {
             }
             if(sleep<5000) {
                 sleep += 100;
+            }else if(!maxTime) {
+                maxTime = true;
             }
         }
         // print end message
-        msg = getMsg();
+        msg = getMsg(null);
         System.out.println(msg + "\nCompleted!");
     }
 
-    public synchronized void addProgress(int value) {
-        progress = progress.add(BigDecimal.valueOf(value));
-    }
-
-    private String getMsg() {
+    private String getMsg(BigInteger dif) {
         double perc;
-        if(progress.compareTo(BigDecimal.ZERO) == 0) {
+        if(progress.compareTo(BigInteger.ZERO) == 0) {
             perc = 0;
         }else {
-            perc = progress.divide(onePerc, 2 , RoundingMode.HALF_UP).doubleValue();
+            perc = new BigDecimal(progress).divide(onePerc, 2 , RoundingMode.HALF_UP).doubleValue();
         }
         String fill = "";
 
         for(int x = 0; x < 20; x++) {
             if(5*x < perc) {
-                fill = fill + base_fill;
+                fill = fill + baseFill;
             }else {
                 fill = fill + " ";
             }
         }
 
-        final long timeNow = System.currentTimeMillis();
+        int x = 0;
+        if (dif != null) {
+            if (!maxTime) {
+                if (sleep == 100) {
+                    dif = null;
+                }else {
+                    x = dif.intValue() / (sleep - 100);
+                }
+            }
+            if (dif != null) {
+                x = dif.intValue() / sleep;
+            }
+        }
 
-        String msg = String.format(base_msg, fill, String.valueOf(perc)) + "%, " + ((timeNow-timeStart) / 1000) + "s";
+        final long timeNow = System.currentTimeMillis();
+        String msg = String.format(baseMsg, fill, String.valueOf(perc)) + "%, ";
+        if (dif != null) {
+            msg += x + " combinations/s, ";
+        }
+        msg += ((timeNow-timeStart) / 1000) + "s";
         return msg;
     }
-
 }
